@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
 
 const ratingAndReviewSchema = new mongoose.Schema({
-    name: {
+    user: {
         type:mongoose.Schema.Types.ObjectId,
         ref:"User",
         required:true,
@@ -14,6 +14,13 @@ const ratingAndReviewSchema = new mongoose.Schema({
         type:String,
         required:true,
     },
+    course:{
+        type:mongoose.Schema.Types.ObjectId,
+        required:true,
+        ref:"Course",
+        index:true,
+    }
+    
 
 });
 
