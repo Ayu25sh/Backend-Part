@@ -2,11 +2,13 @@ const User = require("../models/User");
 const OTP = require("../models/OTP");
 const otpGenerator = require("otp-generator");
 const bcrypt = require("bcrypt");
+const mailSender = require("../utils/mailSender");
 const jwt = require("jsonwebtoken");
-require("dotenv").config();;
+require("dotenv").config();
+const Profile = require("../models/Profile");
 
 //send otp
-exports.sendOTP = async (req,res) => {
+exports.sendotp = async (req,res) => {
     try{
         // fetch the email from req body
         const {email} = req.body;
@@ -42,6 +44,14 @@ exports.sendOTP = async (req,res) => {
             result = await OTP.findOne({otp: otp});
         }
 
+        const emailResponse = await mailSender(
+                                                email,
+                                                "OTP verification email",
+                                                `OTP -  ${otp}`,
+
+                                            );
+        
+        console.log(emailResponse);                                        
         const otpPayLoad = {email,otp};
         // create entry of otp in db
         const otpBody = await OTP.create(otpPayLoad);
@@ -65,17 +75,16 @@ exports.sendOTP = async (req,res) => {
 
 
 //signup
-exports.signUp = async(req,res) =>{
+exports.signup = async(req,res) =>{
     try{
         //data fetch from reqbody
         const{
+            accountType,
             firstName,
             lastName,
             email,
             password,
             confirmPassword,
-            accountType,
-            contactNumber,
             otp,
         } = req.body;
 
@@ -113,11 +122,11 @@ exports.signUp = async(req,res) =>{
                 success:false,
                 message:"otp not found",
             });
-        }else if( otp !== recentOtp.otp){
+        }else if( otp !== recentOtp[0].otp){
             //invalid otp
             return res.status(400).json({
                 success:false,
-                message:"Invalid otp",
+                message:"Invalid otp when",
             });
         }
 
@@ -136,11 +145,10 @@ exports.signUp = async(req,res) =>{
             firstName,
             lastName,
             email,
-            contactNumber,
             password:hashedPassword,
             accountType,
             additionalDetails: profileDetails._id,
-            image:`https://api.dicebear.com/5.x/initials/svg?seed=${firstname} ${lastName}`,
+            image:`https://api.dicebear.com/5.x/initials/svg?seed=${firstName} ${lastName}`,
         })
 
         //return res
@@ -174,8 +182,9 @@ exports.login = async(req,res) => {
         }
 
         //check user already exist or not
-        const user = await User.findOne({email}).populate("additionalDetails");
-        if(!userExist){
+        const user = await User.findOne({email})
+                                    .populate("additionalDetails");
+        if(!user){
             return res.status(400).json({
             success:false,
                 message:"User is not registered",
@@ -183,7 +192,7 @@ exports.login = async(req,res) => {
         }
 
         //generate JWT after comapring pass
-        if(await bcrypt.compare(password,user.password)){
+        if(await bcrypt.compare(String(password),String(user.password))){
             const payload = {
                 email:user.email,
                 id: user._id,
@@ -198,7 +207,7 @@ exports.login = async(req,res) => {
 
             //create cookie and send response
             const options = {
-                expires : new Date.now() + 3*24*60*60*1000,
+                expires : new Date(Date.now() + 3*24*60*60*1000),
                 httpOnly:true,
             }
             res.cookie('token',token,options).status(200).json({
@@ -208,9 +217,10 @@ exports.login = async(req,res) => {
                 message:'User logged in Successfully'
             })
 
-
+            
         }else{
             return res.status(401).json({
+
                 success:false,
                 message:"password is incorrect",
                 });
